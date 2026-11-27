@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>한반도 3D AR 화석 분포 지도</title>
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+      background: #f4f6f9;
+      color: #1f2937;
+      line-height: 1.5;
+    }
+    .container { max-width: 760px; margin: 0 auto; padding: 16px; }
+    .card {
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .header { padding: 18px 20px 14px; border-bottom: 1px solid #e5e7eb; }
+    .badges { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+    .badge {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+    .era { background: #eef2ff; color: #3730a3; }
+    .env-sea { background: #dbeafe; color: #1d4ed8; }
+    .env-land { background: #fee2e2; color: #b91c1c; }
+    .type-badge { background: #f3f4f6; color: #374151; }
+    h1 { font-size: 22px; font-weight: 800; color: #111827; }
+    .viewer-wrap {
+      position: relative;
+      width: 100%;
+      height: 56vh;
+      min-height: 320px;
+      max-height: 520px;
+      background: radial-gradient(circle at center, #ffffff 0%, #e5e7eb 100%);
+    }
+    model-viewer { width: 100%; height: 100%; }
+    .ar-btn {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      background: #111827;
+      color: #ffffff;
+      border: none;
+      border-radius: 999px;
+      padding: 11px 18px;
+      font-size: 14px;
+      font-weight: 700;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+      cursor: pointer;
+    }
+    .hint {
+      text-align: center;
+      font-size: 12px;
+      color: #6b7280;
+      padding: 8px 12px;
+      background: #f9fafb;
+      border-top: 1px solid #e5e7eb;
+    }
+    .info { padding: 18px 20px; }
+    .info-row { margin-bottom: 12px; }
+    .info-row:last-child { margin-bottom: 0; }
+    .label { font-size: 12px; font-weight: 700; color: #6b7280; margin-bottom: 2px; }
+    .value { font-size: 15px; color: #111827; }
+    .error-box {
+      display: none;
+      padding: 14px 18px;
+      background: #fef2f2;
+      color: #991b1b;
+      font-size: 13px;
+      border-top: 1px solid #fecaca;
+    }
+    .nav-bar { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; }
+    .btn {
+      display: inline-block;
+      text-align: center;
+      text-decoration: none;
+      background: #ffffff;
+      color: #111827;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-primary { background: #1d4ed8; color: #ffffff; border-color: #1d4ed8; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .list-item {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 14px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+      border-top: 4px solid #1d4ed8;
+    }
+    .list-item.land { border-top-color: #dc2626; }
+    .qr-card {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 14px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+    .qr-box {
+      display: flex;
+      justify-content: center;
+      margin: 10px 0;
+      padding: 10px;
+      background: #ffffff;
+    }
+    .qr-url {
+      font-size: 11px;
+      color: #6b7280;
+      word-break: break-all;
+      margin-bottom: 10px;
+    }
+    .warn {
+      background: #fffbeb;
+      border: 1px solid #fcd34d;
+      color: #92400e;
+      padding: 12px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      margin-bottom: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="app"></div>
+
+  <script>
+    const FOSSILS = [
+      { id: 1, file: "01.glb", era: "고생대", env: "sea", envText: "바다 (해성층)", mode: "동적 복원", name: "삼엽충", site: "강원 태백·영월·정선 등 조선누층군 일대", desc: "고생대 바다를 대표하는 절지동물로, 얕고 따뜻한 바다 환경과 고생대 지층 대비에 핵심적인 화석입니다." },
+      { id: 2, file: "02.glb", era: "고생대", env: "sea", envText: "바다 (해성층)", mode: "동적 복원", name: "필석류", site: "강원 태백 장성 직운산층 등 고생대 전기 해성층", desc: "톱날 모양의 군체를 이루던 해양 동물로, 고생대 전기 바다의 퇴적층을 구분하는 데 자주 활용됩니다." },
+      { id: 3, file: "03.glb", era: "고생대", env: "sea", envText: "바다 (해성층)", mode: "화석 표본", name: "방추충(푸줄리나)", site: "강원·충북 등 고생대 후기 석탄기~페름기 평안누층군 해성층", desc: "쌀알 모양의 껍데기를 가진 해양 원생동물(유공충)로, 고생대 후기 바다 환경을 알려주는 표준화석입니다." },
+      { id: 4, file: "04.glb", era: "고생대", env: "sea", envText: "바다 (해성층)", mode: "동적 복원", name: "완족류", site: "강원 태백·영월 등 고생대 해성 퇴적층", desc: "두 장의 껍데기가 좌우대칭을 이루는 해양 무척추동물로, 고생대 얕은 바다의 저서 환경을 보여줍니다." },
+      { id: 5, file: "05.glb", era: "고생대", env: "land", envText: "육지 (육성층)", mode: "화석 표본", name: "양치식물 화석", site: "강원 태백·삼척 등 평안누층군 육성층·석탄층", desc: "고생대 후기 한반도가 육지로 융기한 뒤 습윤한 육상 환경에서 번성했으며, 석탄층 형성과 밀접하게 연결됩니다." },
+      { id: 6, file: "06.glb", era: "중생대", env: "land", envText: "육지 (육성층)", mode: "화석 표본", name: "공룡 발자국 화석", site: "경남 고성·남해안 일대, 전남 해남 등 백악기 지층", desc: "호숫가나 강가의 부드러운 퇴적물에 찍힌 흔적화석으로, 공룡의 보행 습성과 군집 생활, 당시 육상 환경을 생생하게 보여줍니다." },
+      { id: 7, file: "07.glb", era: "중생대", env: "land", envText: "육지 (육성층)", mode: "화석 표본", name: "공룡 뼈·알 화석", site: "경남 하동·진주, 전남 보성·해남 등 백악기 육성층", desc: "한반도 백악기 생태계에 서식했던 초식·육식 공룡의 실체와 번식·성장 과정을 파악할 수 있는 핵심 화석입니다." },
+      { id: 8, file: "08.glb", era: "중생대", env: "land", envText: "육지 (육성층)", mode: "화석 표본", name: "새·익룡 발자국 화석", site: "경남 진주·사천·고성 등 백악기 호수 퇴적층", desc: "수변 환경을 따라 공룡 발자국과 함께 산출되는 경우가 많아, 당시 호숫가 생태계의 다양성을 보여주는 자료입니다." },
+      { id: 9, file: "09.glb", era: "중생대", env: "land", envText: "육지·담수 (육성층)", mode: "동적 복원", name: "담수 연체동물 화석", site: "경상누층군·대동누층군 등 중생대 호수·하천 퇴적층", desc: "바다가 아닌 민물(호수·하천) 환경에서 서식했던 조개·고둥류로, 지층이 해성층인지 육성층인지 구분하는 데 유용합니다." },
+      { id: 10, file: "10.glb", era: "중생대", env: "land", envText: "육지 (육성층)", mode: "화석 표본", name: "규화목 및 겉씨식물 화석", site: "경북·경남 등 중생대 육성 퇴적층", desc: "중생대에 번성한 겉씨식물과 삼림 환경을 나타내며, 규화목은 목재 조직이 광물로 치환되어 입체 질감이 잘 보존됩니다." },
+      { id: 11, file: "11.glb", era: "신생대", env: "land", envText: "육지 (육성층)", mode: "화석 표본", name: "식물 잎 화석", site: "경북 포항 금광동층·장기층군 등 신생대 육성 퇴적층", desc: "잎맥과 형태가 선명하게 남아 신생대 한반도의 고기후·식생 변화와 동해 형성 전후의 지리적 변화를 추론하게 해줍니다." },
+      { id: 12, file: "12.glb", era: "신생대", env: "land", envText: "육지 (육성층)", mode: "화석 표본", name: "신생대 나무화석", site: "경북 포항 금광리 일대 신생대 퇴적층", desc: "옹이와 나뭇결 구조가 관찰되는 대형 표본으로, 신생대 삼림 환경과 퇴적 과정을 이해하는 데 유용합니다." },
+      { id: 13, file: "13.glb", era: "신생대", env: "sea", envText: "바다 (해성층)", mode: "동적 복원", name: "고래 골격 화석", site: "경북 포항 두호층·장량동 등 신생대 마이오세 해성층", desc: "동해가 형성·확장되던 신생대 바다 환경에 살았던 해양 포유류로, 고생대·중생대와 대비되는 신생대 해양상을 보여줍니다." },
+      { id: 14, file: "14.glb", era: "신생대", env: "sea", envText: "바다 (해성층)", mode: "동적 복원", name: "해성 무척추동물 화석", site: "경북 포항 연일층군·두호층, 제주 서귀포층 등 신생대 해성층", desc: "신생대 연안 및 대륙붕 바다 환경을 지시하며, 현재 살아 있는 생물과 형태가 가까워 비교 관찰하기 쉽습니다." },
+      { id: 15, file: "15.glb", era: "신생대", env: "land", envText: "육지 (육성층)", mode: "동적 복원", name: "포유류 화석", site: "충북 청원 두루봉 동굴 등 신생대 후기(제4기) 퇴적층", desc: "신생대에 크게 번성한 포유류의 특징을 보여주는 화석으로, 빙하기·간빙기 등 제4기 환경과 연계해 설명할 수 있습니다." }
+    ];
+
+    const app = document.getElementById("app");
+    const params = new URLSearchParams(window.location.search);
+    const idParam = Number(params.get("id"));
+    const qrParam = params.get("qr");
+
+    function renderViewer(fossil) {
+      document.title = `${fossil.id}. ${fossil.name} - 3D AR 화석`;
+      const envClass = fossil.env === "sea" ? "env-sea" : "env-land";
+      const prevId = fossil.id > 1 ? fossil.id - 1 : 15;
+      const nextId = fossil.id < 15 ? fossil.id + 1 : 1;
+
+      app.innerHTML = `
+        <div class="card">
+          <div class="header">
+            <div class="badges">
+              <span class="badge era">${fossil.era}</span>
+              <span class="badge ${envClass}">${fossil.envText}</span>
+              <span class="badge type-badge">${fossil.mode}</span>
+            </div>
+            <h1>${String(fossil.id).padStart(2, "0")}. ${fossil.name}</h1>
+          </div>
+          <div class="viewer-wrap">
+            <model-viewer
+              id="mv"
+              src="./${fossil.file}"
+              alt="${fossil.name} 3D 모델"
+              ar
+              ar-modes="webxr scene-viewer quick-look"
+              camera-controls
+              autoplay
+              auto-rotate
+              rotation-per-second="18deg"
+              shadow-intensity="1"
+              environment-image="neutral"
+              exposure="1.0">
+              <button slot="ar-button" class="ar-btn">내 공간에 띄우기 (AR)</button>
+            </model-viewer>
+          </div>
+          <div class="hint">손가락으로 드래그해 360도 회전하고, 두 손가락으로 확대·축소할 수 있습니다.</div>
+          <div class="error-box" id="errBox">
+            3D 파일(<strong>${fossil.file}</strong>)을 불러오지 못했습니다. GitHub 저장소에 파일 이름이 정확히 <strong>${fossil.file}</strong>로 올라갔는지 확인해 주세요.
+          </div>
+          <div class="info">
+            <div class="info-row">
+              <div class="label">주요 산출지</div>
+              <div class="value">${fossil.site}</div>
+            </div>
+            <div class="info-row">
+              <div class="label">고환경 및 특징</div>
+              <div class="value">${fossil.desc}</div>
+            </div>
+          </div>
+        </div>
+        <div class="nav-bar">
+          <a class="btn" href="?id=${prevId}">◀ 이전 화석</a>
+          <a class="btn" href="./">전체 15종 목록</a>
+          <a class="btn" href="?id=${nextId}">다음 화석 ▶</a>
+        </div>
+      `;
+
+      const mv = document.getElementById("mv");
+      mv.addEventListener("error", () => {
+        document.getElementById("errBox").style.display = "block";
+      });
+    }
+
+    function renderQRPage() {
+      document.title = "15종 화석 QR코드 일괄 생성";
+      const baseUrl = window.location.origin + window.location.pathname;
+      const isLocal = window.location.protocol === "file:";
+
+      app.innerHTML = `
+        <div class="card" style="padding: 18px 20px;">
+          <h1 style="margin-bottom: 8px;">15종 화석 카드용 QR코드</h1>
+          <p style="font-size: 14px; color: #4b5563; margin-bottom: 12px;">
+            각 QR코드에는 카드 인쇄 시 인식률을 높이기 위한 흰색 여백이 자동으로 포함됩니다.
+          </p>
+          ${isLocal ? `<div class="warn">현재 내 컴퓨터(file://)에서 열려 있습니다. 반드시 <strong>GitHub Pages에 업로드한 뒤 발급된 https:// 주소</strong>에서 이 페이지를 열어 QR코드를 저장하세요.</div>` : ""}
+          <a class="btn" href="./">◀ 전체 목록으로 돌아가기</a>
+        </div>
+        <div class="grid" id="qrGrid"></div>
+      `;
+
+      const grid = document.getElementById("qrGrid");
+      FOSSILS.forEach((f) => {
+        const targetUrl = `${baseUrl}?id=${f.id}`;
+        const num = String(f.id).padStart(2, "0");
+        const card = document.createElement("div");
+        card.className = "qr-card";
+        card.innerHTML = `
+          <div style="font-weight: 800; font-size: 15px;">${num}. ${f.name}</div>
+          <div style="font-size: 12px; color: ${f.env === "sea" ? "#1d4ed8" : "#b91c1c"}; font-weight: 700;">${f.era} · ${f.envText}</div>
+          <div class="qr-box" id="qr-${f.id}"></div>
+          <div class="qr-url">${targetUrl}</div>
+          <button class="btn btn-primary" style="width: 100%; padding: 8px;" data-id="${f.id}">PNG 저장</button>
+        `;
+        grid.appendChild(card);
+
+        const qrContainer = card.querySelector(`#qr-${f.id}`);
+        new QRCode(qrContainer, {
+          text: targetUrl,
+          width: 220,
+          height: 220,
+          colorDark: "#000000",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.M
+        });
+
+        card.querySelector("button").addEventListener("click", () => {
+          const srcCanvas = qrContainer.querySelector("canvas");
+          const srcImg = qrContainer.querySelector("img");
+          const pad = 24;
+          const size = 220 + pad * 2;
+          const out = document.createElement("canvas");
+          out.width = size;
+          out.height = size;
+          const ctx = out.getContext("2d");
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, size, size);
+          if (srcCanvas) {
+            ctx.drawImage(srcCanvas, pad, pad, 220, 220);
+          } else if (srcImg) {
+            ctx.drawImage(srcImg, pad, pad, 220, 220);
+          }
+          const a = document.createElement("a");
+          a.href = out.toDataURL("image/png");
+          a.download = `${num}_${f.name}_QR.png`;
+          a.click();
+        });
+      });
+    }
+
+    function renderHome() {
+      app.innerHTML = `
+        <div class="card" style="padding: 20px;">
+          <h1 style="margin-bottom: 6px;">한반도 3D AR 화석 분포 지도 (15종)</h1>
+          <p style="font-size: 14px; color: #4b5563; margin-bottom: 14px;">
+            아래에서 각 화석을 눌러 3D 모델과 AR 작동을 테스트하세요. 파란색 테두리는 바다(해성층), 빨간색 테두리는 육지·담수(육성층)입니다.
+          </p>
+          <a class="btn btn-primary" href="?qr=all">15종 QR코드 한 번에 저장하기</a>
+        </div>
+        <div class="grid">
+          ${FOSSILS.map((f) => `
+            <a class="list-item ${f.env === "land" ? "land" : ""}" href="?id=${f.id}">
+              <div class="badges" style="margin-bottom: 6px;">
+                <span class="badge era">${f.era}</span>
+                <span class="badge ${f.env === "sea" ? "env-sea" : "env-land"}">${f.envText}</span>
+              </div>
+              <div style="font-size: 16px; font-weight: 800; margin-bottom: 4px;">${String(f.id).padStart(2, "0")}. ${f.name}</div>
+              <div style="font-size: 12px; color: #6b7280;">파일: ${f.file}</div>
+            </a>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    const found = FOSSILS.find((f) => f.id === idParam);
+    if (qrParam === "all") {
+      renderQRPage();
+    } else if (found) {
+      renderViewer(found);
+    } else {
+      renderHome();
+    }
+  </script>
+</body>
+</html>
